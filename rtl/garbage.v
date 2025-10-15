@@ -13,7 +13,7 @@ module lvds_serdes #(
     // Transmit Interface (System domain)
     input  wire [PARALLEL_WIDTH-1:0]   tx_data_in,
     input  wire                        tx_data_valid,
-    output wire                        tx_data_ready,
+    output reg                        tx_data_ready,
     output wire                        tx_lvds_out_p,
     output wire                        tx_lvds_out_n,
 
@@ -59,6 +59,34 @@ module lvds_serdes #(
     wire tx_word_valid = ~tx_fifo_empty;
 
 `else
+
+    // System domain (write)
+    always@(posedge clk_sys or negedge reset_n) begin
+        if(!reset_n) begin
+            tx_data_ready <= 0;
+        end
+        else if(tx_data_valid && tx_data_ready) begin
+            tx_buffer <= tx_data_in;
+
+        end
+        else begin
+            tx_buffer <= tx_buffer;
+        end
+    end
+
+    always@(posedge clk_serial or negedge reset_n) begin
+        if(!reset_n) begin
+            tx_data_ready <= 0;
+        end
+        else if() begin
+            req_serial_sync1 <= tx_data_valid;
+            req_serial_sync2 <= req_serial_sync1;
+            tx_serial_domain_data <= tx_buffer;
+
+        end
+    end
+
+
     // ---------- HANDSHAKE-BASED CDC ----------
     reg [PARALLEL_WIDTH-1:0] tx_buffer;
     reg req, ack_sys_sync1, ack_sys_sync2;
@@ -66,41 +94,43 @@ module lvds_serdes #(
     reg req_serial_sync1, req_serial_sync2;
     reg ack_serial;
 
-    // System domain (write)
+    // System domain (accepting parallel output into buffer)
     always @(posedge clk_sys or negedge reset_n) begin
         if (!reset_n) begin
-            req <= 1'b0;
-            tx_buffer <= 0;
-        end else if (tx_data_valid && !req) begin
+            tx_buffer     <= 0;
+            tx_data_ready <= 1;
+        end 
+        else if (tx_data_valid && tx_data_ready) begin
             tx_buffer <= tx_data_in;
-            req <= 1'b1;
-        end else if (ack_sys_sync2) begin
-            req <= 1'b0;
+            tx_data_ready <= 1'b0;
+        end 
+        //checking if the synched ack from serial domain is asserted to point out that the data frame has been accepted by the serial side
+        else if (ack_sys_sync2) begin
+            tx_data_ready <= 1'b1;
         end
     end
 
-    assign tx_data_ready = ~req;
-
-    // Serial domain (read)
-    always @(posedge clk_serial or negedge reset_n) begin
-        if (!reset_n) begin
-            req_serial_sync1 <= 1'b0;
-            req_serial_sync2 <= 1'b0;
-            ack_serial <= 1'b0;
-        end else begin
-            req_serial_sync1 <= req;
+    //Synch Signals & Serial Domain
+    always@(posedge clk_serial or negedge reset_n) begin
+        if(~reset_n) begin
+            req_serial_sync1 <= 0;
+            req_serial_sync2 <= 0;
+            ack_serial       <= 0;
+        end
+        else begin
+            req_serial_sync1 <= tx_data_ready;
             req_serial_sync2 <= req_serial_sync1;
-
-            if (req_serial_sync2 && !ack_serial) begin
+            if(req_serial_sync2 && !ack_serial) begin
                 tx_serial_domain_data <= tx_buffer;
-                ack_serial <= 1'b1;
-            end else if (!req_serial_sync2) begin
+                ack_serial            <= 1'b1;
+            end
+            else if(!req_serial_sync2) begin
                 ack_serial <= 1'b0;
             end
         end
     end
 
-    // Send ack back to system domain
+    // Synch Serial Domain ack back to system domain
     always @(posedge clk_sys or negedge reset_n) begin
         if (!reset_n) begin
             ack_sys_sync1 <= 1'b0;
@@ -126,10 +156,12 @@ module lvds_serdes #(
         if (!reset_n) begin
             tx_shift_reg <= 0;
             bit_counter  <= 0;
-        end else if (tx_word_valid && bit_counter == 0) begin
+        end 
+        else if (tx_word_valid && bit_counter == 0) begin
             tx_shift_reg <= tx_parallel_word;
             bit_counter  <= PARALLEL_WIDTH - 1;
-        end else if (bit_counter != 0) begin
+        end 
+        else if (bit_counter != 0) begin
             tx_shift_reg <= {tx_shift_reg[PARALLEL_WIDTH-2:0], 1'b0};
             bit_counter  <= bit_counter - 1;
         end
@@ -138,6 +170,35 @@ module lvds_serdes #(
     wire tx_serial_bit = tx_shift_reg[PARALLEL_WIDTH-1];
     assign tx_lvds_out_p = tx_serial_bit;
     assign tx_lvds_out_n = ~tx_serial_bit;
+
+    // Synchronize tx_word_valid into serial domain
+    reg tx_word_valid_sync1, tx_word_valid_sync2;
+    always @(posedge clk_serial or negedge reset_n) begin
+        if (!reset_n) begin
+            tx_word_valid_sync1 <= 0;
+            tx_word_valid_sync2 <= 0;
+        end 
+        else begin
+            tx_word_valid_sync1 <= tx_word_valid;
+            tx_word_valid_sync2 <= tx_word_valid_sync1;
+        end
+    end
+
+    wire tx_word_valid_rx = tx_word_valid_sync2;
+
+    // Generate rx_word_valid to gate deserialization
+    reg rx_word_valid;
+    always @(posedge clk_serial or negedge reset_n) begin
+        if (!reset_n) begin
+            rx_word_valid <= 1'b0;
+        end
+        else if (tx_word_valid_rx) begin
+            rx_word_valid <= 1'b1;
+        end
+        else begin
+            rx_word_valid <= 1'b0;
+        end
+    end
 
     // ============================================================
     // 3. Deserializer (Serial → Parallel)
@@ -153,16 +214,17 @@ module lvds_serdes #(
         if (!reset_n) begin
             rx_shift_reg <= 0;
             rx_bit_counter <= 0;
-            rx_parallel_valid <= 1'b0;
-        end else begin
-            rx_shift_reg <= {rx_shift_reg[PARALLEL_WIDTH-2:0], rx_serial_bit};
-            if (rx_bit_counter == PARALLEL_WIDTH - 1) begin
+            rx_data_valid  <= 0;
+        end 
+        else if(rx_word_valid) begin
+            rx_shift_reg   <= {rx_shift_reg[PARALLEL_WIDTH-2:0], rx_serial_bit};
+            if(rx_bit_counter == PARALLEL_WIDTH - 1) begin
+                rx_data_valid  <= 1;
                 rx_bit_counter <= 0;
-                rx_parallel_word <= {rx_shift_reg[PARALLEL_WIDTH-2:0], rx_serial_bit};
-                rx_parallel_valid <= 1'b1;
-            end else begin
+            end
+            else begin
                 rx_bit_counter <= rx_bit_counter + 1;
-                rx_parallel_valid <= 1'b0;
+                rx_data_valid  <= 0;
             end
         end
     end

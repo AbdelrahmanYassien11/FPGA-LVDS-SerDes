@@ -104,5 +104,14 @@ lvds_RX #( .PARALLEL_WIDTH(8)) rx1 (
     .rx_data_valid(rx_data_valid)
 );
 
+    reg [7:0] debug_counter;
+    always @(posedge clk_sys or negedge reset_n) begin
+    if (!reset_n)
+        debug_counter <= 8'b0;
+    else
+        debug_counter <= debug_counter + 1;
+    end
+    assign rx_data_out = debug_counter; // Just to drive the output with a register
+
 
 endmodule 

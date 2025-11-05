@@ -1,0 +1,13 @@
+set_global_assignment -entity "pll50to400mhz" -library "pll50to400mhz" -name IP_TOOL_NAME "altera_pll"
+set_global_assignment -entity "pll50to400mhz" -library "pll50to400mhz" -name IP_TOOL_VERSION "13.1"
+set_global_assignment -entity "pll50to400mhz" -library "pll50to400mhz" -name IP_TOOL_ENV "mwpim"
+set_global_assignment -library "pll50to400mhz" -name MISC_FILE [file join $::quartus(qip_path) "pll50to400mhz.cmp"]
+set_global_assignment -name SYNTHESIS_ONLY_QIP ON
+
+set_global_assignment -library "pll50to400mhz" -name VERILOG_FILE [file join $::quartus(qip_path) "pll50to400mhz.v"]
+set_global_assignment -library "pll50to400mhz" -name VERILOG_FILE [file join $::quartus(qip_path) "pll50to400mhz/pll50to400mhz_0002.v"]
+set_global_assignment -library "pll50to400mhz" -name QIP_FILE [file join $::quartus(qip_path) "pll50to400mhz/pll50to400mhz_0002.qip"]
+
+set_global_assignment -entity "pll50to400mhz_0002" -library "pll50to400mhz" -name IP_TOOL_NAME "altera_pll"
+set_global_assignment -entity "pll50to400mhz_0002" -library "pll50to400mhz" -name IP_TOOL_VERSION "13.1"
+set_global_assignment -entity "pll50to400mhz_0002" -library "pll50to400mhz" -name IP_TOOL_ENV "mwpim"

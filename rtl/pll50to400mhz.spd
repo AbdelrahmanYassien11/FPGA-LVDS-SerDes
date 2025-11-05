@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simPackage>
+ <file path="pll50to400mhz_sim/pll50to400mhz.vo" type="VERILOG" />
+ <topLevel name="pll50to400mhz" />
+ <deviceFamily name="cyclonev" />
+</simPackage>

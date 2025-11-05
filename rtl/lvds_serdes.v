@@ -20,6 +20,27 @@ module lvds_serdes #(
     output wire                        rx_data_valid
 );
 
+
+// ----------------------------------------------- Internal Wires ------------------------------------------------
+// Wires for clocks
+wire clk_sys_pll;
+wire clk_serial_pll;
+
+// For the system clock to increase its frequency from 50 to 100
+	pll pll_50to100_inst (
+		.refclk   (clk_sys),   //  refclk.clk
+		.rst      (reset_n),      //   reset.reset
+		.outclk_0 (clk_sys_pll), // outclk0.clk
+		.locked   (locked)    //  locked.export
+	);
+
+// For the system clock to increase its frequency from 50 to 400
+		pll50to400mhz pll_50to400_inst (
+		.refclk   (clk_serial),   //  refclk.clk
+		.rst      (reset_n),      //   reset.reset
+		.outclk_0 (clk_serial_pll), // outclk0.clk
+		.locked   (locked)    //  locked.export
+	);
 // ----------------------------------------------- Internal Wires ------------------------------------------------
 // TX Interface Inestantiation
 wire [PARALLEL_WIDTH-1:0] tx_parallel_word;
@@ -37,7 +58,7 @@ wire                      deserializer_rx_frame_pulse;
 
 // TX Interface Inestantiation
 lvds_TX #(.PARALLEL_WIDTH(8), .SERIAL_RATIO(8)) tx1 (
-    .clk_sys(clk_sys),
+    .clk_sys(clk_sys_pll),
     .reset_n(reset_n),
     
     // Transmit Interface (System domain) - INPUTS
@@ -57,7 +78,7 @@ lvds_TX #(.PARALLEL_WIDTH(8), .SERIAL_RATIO(8)) tx1 (
 
 // Serializer Inestantiation
 lvds_serializer #( .PARALLEL_WIDTH(8)) ser1 (
-    .clk_serial(clk_serial),
+    .clk_serial(clk_serial_plls_pll),
     .reset_n(reset_n),
 
     // From TX (system domain synchronized)
@@ -74,7 +95,7 @@ lvds_serializer #( .PARALLEL_WIDTH(8)) ser1 (
 
 // Deserializer Inestantiation
 lvds_deserializer #( .PARALLEL_WIDTH(8)) des1 (
-    .clk_serial(clk_serial),
+    .clk_serial(clk_serial_plls_pll),
     .reset_n(reset_n),
 
     // From TX (system domain synchronized)
@@ -92,7 +113,7 @@ lvds_deserializer #( .PARALLEL_WIDTH(8)) des1 (
 
 // RX Interface Inestantiation                               
 lvds_RX #( .PARALLEL_WIDTH(8)) rx1 (  
-    .clk_sys(clk_sys),
+    .clk_sys(clk_sys_pll),
     .reset_n(reset_n),
 
     // Receive Interface (System domain)
@@ -103,15 +124,6 @@ lvds_RX #( .PARALLEL_WIDTH(8)) rx1 (
     .rx_data_out(rx_data_out),
     .rx_data_valid(rx_data_valid)
 );
-
-    reg [7:0] debug_counter;
-    always @(posedge clk_sys or negedge reset_n) begin
-    if (!reset_n)
-        debug_counter <= 8'b0;
-    else
-        debug_counter <= debug_counter + 1;
-    end
-    assign rx_data_out = debug_counter; // Just to drive the output with a register
 
 
 endmodule 

@@ -17,7 +17,7 @@ module lvds_TX #(
 );
     ff_synch #(.STAGES(2)) ff2_synch (
         .reset_n(reset_n),
-        .sync_clock(clk_sysl),
+        .sync_clock(clk_sys),
         .needs_to_be_synced(ack_serial),
         .sync_out(ack_serial_synched)
     );

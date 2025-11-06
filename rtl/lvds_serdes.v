@@ -6,8 +6,7 @@ module lvds_serdes #(
     parameter PARALLEL_WIDTH = 8,
     parameter SERIAL_RATIO   = 8 
 )(
-    input  wire                        clk_sys,       // Parallel (system) domain clock
-    input  wire                        clk_serial,    // Serial domain clock (faster)
+    input  wire                        clk_in,
     input  wire                        reset_n,
 
     // Transmit Interface (System domain)
@@ -23,22 +22,14 @@ module lvds_serdes #(
 
 // ----------------------------------------------- Internal Wires ------------------------------------------------
 // Wires for clocks
-wire clk_sys_pll;
-wire clk_serial_pll;
+wire clk_sys_pll;       // Parallel (system) domain clock
+wire clk_serial_pll;    // Serial domain clock (faster)
 
-// For the system clock to increase its frequency from 50 to 100
-	pll pll_50to100_inst (
-		.refclk   (clk_sys),   //  refclk.clk
+	pll pll_inst1 (
+		.refclk   (clk_in),   //  refclk.clk
 		.rst      (reset_n),      //   reset.reset
 		.outclk_0 (clk_sys_pll), // outclk0.clk
-		.locked   (locked)    //  locked.export
-	);
-
-// For the system clock to increase its frequency from 50 to 400
-		pll50to400mhz pll_50to400_inst (
-		.refclk   (clk_serial),   //  refclk.clk
-		.rst      (reset_n),      //   reset.reset
-		.outclk_0 (clk_serial_pll), // outclk0.clk
+		.outclk_1 (clk_serial_pll), // outclk1.clk
 		.locked   (locked)    //  locked.export
 	);
 // ----------------------------------------------- Internal Wires ------------------------------------------------
@@ -78,7 +69,7 @@ lvds_TX #(.PARALLEL_WIDTH(8), .SERIAL_RATIO(8)) tx1 (
 
 // Serializer Inestantiation
 lvds_serializer #( .PARALLEL_WIDTH(8)) ser1 (
-    .clk_serial(clk_serial_plls_pll),
+    .clk_serial(clk_serial_pll),
     .reset_n(reset_n),
 
     // From TX (system domain synchronized)
@@ -95,7 +86,7 @@ lvds_serializer #( .PARALLEL_WIDTH(8)) ser1 (
 
 // Deserializer Inestantiation
 lvds_deserializer #( .PARALLEL_WIDTH(8)) des1 (
-    .clk_serial(clk_serial_plls_pll),
+    .clk_serial(clk_serial_pll),
     .reset_n(reset_n),
 
     // From TX (system domain synchronized)

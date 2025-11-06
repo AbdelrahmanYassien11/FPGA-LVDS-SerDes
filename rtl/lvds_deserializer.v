@@ -64,6 +64,6 @@ module lvds_deserializer #(
 
     assign rx_frame_pulse    = rx_frame_pulse_reg;
     assign deserialized_word = (rx_frame_pulse_reg? parallel_word:0);
-
+    // assign deserialized_word = parallel_word;
 endmodule
 
